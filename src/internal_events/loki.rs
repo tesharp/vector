@@ -1,6 +1,8 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
+use super::prelude::{error_stage, error_type};
+
 #[derive(Debug)]
 pub struct LokiEventUnlabeled;
 
@@ -47,5 +49,28 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
         counter!("processing_errors_total", 1,
                 "error_type" => "out_of_order"); // deprecated
         counter!("rewritten_timestamp_events_total", self.count as u64);
+    }
+}
+
+pub struct LokiParseError {
+    pub error: prost::DecodeError,
+}
+
+impl InternalEvent for LokiParseError {
+    fn emit(self) {
+        error!(
+            message = "Parsing error.",
+            error = %self.error,
+            error_code = "parser_error",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "parser_error",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
     }
 }

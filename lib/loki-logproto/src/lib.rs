@@ -70,6 +70,70 @@ pub mod util {
         labels.sort();
         return format!("{{{}}}", labels.join(", "));
     }
+
+    pub fn decode_labels_map_to_string(labels: &str) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        let list = rem_first_and_last(labels).split(", ");
+
+        for item in list {
+            let mut kv = item.split("=");
+            let key = kv.next();
+            let value = kv.next();
+
+            match value {
+                None => (),
+                Some(str) => {
+                    map.insert(key.unwrap().into(), unescape_string_literal(str));
+                }
+            }
+        }
+
+        map
+    }
+
+    fn rem_first_and_last(value: &str) -> &str {
+        let mut chars = value.chars();
+        chars.next();
+        chars.next_back();
+        chars.as_str()
+    }
+
+    fn unescape_string_literal(mut s: &str) -> String {
+        s = rem_first_and_last(s);
+        let mut string = String::with_capacity(s.len());
+        while let Some(i) = s.bytes().position(|b| b == b'\\') {
+            let next = s.as_bytes()[i + 1];
+            if next == b'\n' {
+                // Remove the \n and any ensuing spaces or tabs
+                string.push_str(&s[..i]);
+                let remaining = &s[i + 2..];
+                let whitespace: usize = remaining
+                    .chars()
+                    .take_while(|c| c.is_whitespace())
+                    .map(|c| c.len_utf8())
+                    .sum();
+                s = &s[i + whitespace + 2..];
+            } else {
+                let c = match next {
+                    b'\'' => '\'',
+                    b'"' => '"',
+                    b'\\' => '\\',
+                    b'n' => '\n',
+                    b'r' => '\r',
+                    b't' => '\t',
+                    b'{' => '{',
+                    _ => unimplemented!("invalid escape"),
+                };
+
+                string.push_str(&s[..i]);
+                string.push(c);
+                s = &s[i + 2..];
+            }
+        }
+
+        string.push_str(s);
+        string
+    }
 }
 
 #[cfg(test)]
